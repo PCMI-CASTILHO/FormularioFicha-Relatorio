@@ -1547,7 +1547,7 @@
 			// ======== Renderização de itens ========
 			registros.forEach(registro => {
 				// Formatação de data legível
-				const dataLegivel = new Date(registro.id).toLocaleDateString();
+				const dataLegivel = new Date(registro.id).toLocaleString('pt-BR');
 				
 				// Ícone de status baseado em sincronização
 				const statusIcon = registro.sincronizado 
@@ -1846,7 +1846,7 @@
 				// Fase 5: Service Worker registration (PWA capabilities)
 				if ('serviceWorker' in navigator) {
 					window.addEventListener('load', () => {
-						navigator.serviceWorker.register('./sw.js?v=0094')
+						navigator.serviceWorker.register('./sw.js?v=0095')
 							.then(reg => {
 								console.log('Service Worker registrado com sucesso. Scope:', reg.scope);
 							})
