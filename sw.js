@@ -6,7 +6,7 @@
 importScripts('https://cdn.jsdelivr.net/npm/idb@8/build/umd.js');
 
 // Nomenclatura de cache versionada
-const CACHE_NAME = 'formulario-cache-v0095';
+const CACHE_NAME = 'formulario-cache-v0096';
 
 // Assets críticos para instalação mínima
 const CORE_ASSETS = [
