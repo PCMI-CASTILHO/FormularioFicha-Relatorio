@@ -197,6 +197,11 @@
 					<span id="status-indicator" class="status-indicator status-offline"></span>
 					<span id="status-text">Offline</span>
 				</div>
+				<!-- Botão para bloquear sincronização automática -->
+				<button id="toggle-auto-sync-btn" class="btn-secondary px-4 py-2 rounded-lg flex items-center" aria-pressed="false" title="Bloquear sincronização automática e manter apenas sincronização manual">
+					<i class="fas fa-user-lock mr-2"></i>
+					<span id="toggle-auto-sync-text">Auto Sync: Ativa</span>
+				</button>
 				<!-- Botão de sincronização de dados offline -->
 				<button id="sync-btn" class="btn-primary px-4 py-2 rounded-lg flex items-center relative">
 					<i class="fas fa-sync-alt mr-2"></i> Sincronizar
@@ -708,6 +713,8 @@
 			maxRetention: 14 * 24 * 60 * 60 * 1000 // 2 semanas
 		};
 
+		const AUTO_SYNC_STORAGE_KEY = 'syncAutoBlocked';
+		
 		// ======== Gerador de Chave Única ========
 		function generateUniqueKey() {
 			const timestamp = Date.now().toString(36);
@@ -718,6 +725,10 @@
 		// ======== Registro de Background Sync ========
 		// Utiliza API de sincronização em segundo plano quando disponível
 		async function registrarBackgroundSync() {
+			if (syncState.autoSyncBlocked) {
+				return false;
+			}
+			
 			// Verifica suporte do navegador para Background Sync API
 			if ('serviceWorker' in navigator && 'SyncManager' in window) {
 				try {
@@ -738,12 +749,13 @@
 		let syncState = {
 			pendingCount: 0,	// Contador de formulários pendentes de envio
 			isSyncing: false,	// Flag para evitar concorrência (mutex)
-			syncInterval: null	// Referência do intervalo de polling
+			syncInterval: null	// Referência do intervalo de polling,
+			autoSyncBlocked: false // Bloqueia sincronização automática
 		};
 
 		// ======== Elementos da interface ========
 		// Controla o estado atual das operações de sincronização
-		let syncBtn, syncBadge, syncIcon;
+		let syncBtn, syncBadge, syncIcon, toggleAutoSyncBtn, toggleAutoSyncText;
 
 		// Elementos DOM
 		// Cache de elementos para melhor performance
@@ -831,6 +843,10 @@
 			// Sincronização manual (se disponível)
 			if (document.getElementById('sync-btn')) {
 				document.getElementById('sync-btn').addEventListener('click', manualSync);
+			}
+			
+			if (document.getElementById('toggle-auto-sync-btn')) {
+				document.getElementById('toggle-auto-sync-btn').addEventListener('click', toggleAutoSyncMode);
 			}
 		}
 		
@@ -1482,13 +1498,15 @@
 				state.formularioEmEdicaoId = id;
 				
 				// Registra para sincronização em background
-				await registrarBackgroundSync();
+				if (!syncState.autoSyncBlocked) {
+					await registrarBackgroundSync();
+				}
 				
 				// Atualiza contador de pendências
 				await updatePendingCount();
 				
-				// Tenta sincronização imediata se online
-				if (navigator.onLine) {
+				// Tenta sincronização imediata se online (se modo automático estiver ativo)
+				if (navigator.onLine && !syncState.autoSyncBlocked) {
 					setTimeout(() => attemptSync(), 1000);
 				}
 
@@ -1859,7 +1877,7 @@
 				// Fase 5: Service Worker registration (PWA capabilities)
 				if ('serviceWorker' in navigator) {
 					window.addEventListener('load', () => {
-						navigator.serviceWorker.register('./sw.js?v=0097')
+						navigator.serviceWorker.register('./sw.js?v=0098')
 							.then(reg => {
 								console.log('Service Worker registrado com sucesso. Scope:', reg.scope);
 							})
@@ -2496,6 +2514,11 @@
 			syncBtn = document.getElementById('sync-btn');
 			syncBadge = document.getElementById('sync-badge');
 			syncIcon = syncBtn.querySelector('i');
+			toggleAutoSyncBtn = document.getElementById('toggle-auto-sync-btn');
+			toggleAutoSyncText = document.getElementById('toggle-auto-sync-text');
+
+			loadAutoSyncPreference();
+			updateAutoSyncToggleUI();
 			
 			// Inicialização do polling de sincronização
 			startSyncInterval();
@@ -2511,6 +2534,11 @@
 		// ======== Gerenciamento do estado online/offline ========
 		// Handlers para transições de estado online/offline
 		function handleOnlineStatus() {
+			if (syncState.autoSyncBlocked) {
+				showNotification('Conexão restaurada - modo manual ativo', 'info');
+				return;
+			}
+			
 			showNotification('Conexão restaurada - Sincronizando...', 'success');
 			startSyncInterval();	// Reinicia polling
 			attemptSync();			// Trigger de sincronização imediata
@@ -2525,7 +2553,7 @@
 		// ======== Controle do intervalo de sincronização ========
 		// Gerenciamento de interval timer para sincronização periódica
 		function startSyncInterval() {
-			if (!navigator.onLine) return;	// Early exit se offline
+			if (!navigator.onLine || syncState.autoSyncBlocked) return;	// Early exit se offline ou modo manual
 			
 			stopSyncInterval(); // Idempotência: garante que não há intervalos duplicados
 			
@@ -2544,6 +2572,44 @@
 			}
 		}
 
+		function loadAutoSyncPreference() {
+			syncState.autoSyncBlocked = localStorage.getItem(AUTO_SYNC_STORAGE_KEY) === 'true';
+		}
+
+		function updateAutoSyncToggleUI() {
+			if (!toggleAutoSyncBtn || !toggleAutoSyncText) return;
+
+			if (syncState.autoSyncBlocked) {
+				toggleAutoSyncText.textContent = 'Auto Sync: Bloqueada';
+				toggleAutoSyncBtn.classList.remove('btn-secondary');
+				toggleAutoSyncBtn.classList.add('bg-amber-100', 'text-amber-800', 'border', 'border-amber-300');
+				toggleAutoSyncBtn.setAttribute('aria-pressed', 'true');
+			} else {
+				toggleAutoSyncText.textContent = 'Auto Sync: Ativa';
+				toggleAutoSyncBtn.classList.add('btn-secondary');
+				toggleAutoSyncBtn.classList.remove('bg-amber-100', 'text-amber-800', 'border', 'border-amber-300');
+				toggleAutoSyncBtn.setAttribute('aria-pressed', 'false');
+			}
+		}
+
+		function toggleAutoSyncMode() {
+			syncState.autoSyncBlocked = !syncState.autoSyncBlocked;
+			localStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(syncState.autoSyncBlocked));
+			updateAutoSyncToggleUI();
+
+			if (syncState.autoSyncBlocked) {
+				stopSyncInterval();
+				showNotification('Sincronização automática bloqueada. Use "Sincronizar" manualmente.', 'info');
+				return;
+			}
+
+			startSyncInterval();
+			showNotification('Sincronização automática reativada.', 'success');
+			if (navigator.onLine) {
+				attemptSync();
+			}
+		}
+		
 		// ======== Sincronização manual ========
 		// Trigger explícito de sincronização via ação do usuário
 		async function manualSync() {
