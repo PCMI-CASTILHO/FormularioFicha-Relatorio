@@ -1428,14 +1428,21 @@
 			// Coleta dados do formulário
 			const f = collectFormData(); 
 			
-			// Geração de ID baseado em timestamp
-			const id = Date.now();
+			const db = await initDB();
+			const idEdicao = state.formularioEmEdicaoId ? Number(state.formularioEmEdicaoId) : null;
+			const registroExistente = idEdicao ? await db.get(STORE_NAME, idEdicao) : null;
+
+			// Mantém o mesmo ID quando estiver editando
+			const id = registroExistente ? registroExistente.id : Date.now();
+			const createdAt = registroExistente?.createdAt || new Date().toISOString();
+			const chaveUnica = registroExistente?.chaveUnica || generateUniqueKey();
 			
 			// ======== Estrutura do registro offline ========
 			const registro = {
 				// Metadados
 				id: id,
-				createdAt: new Date().toISOString(),
+				createdAt,
+				updatedAt: new Date().toISOString(),
 			
 				cliente: f.cliente,
 				cidade: f.cidade,
@@ -1463,14 +1470,16 @@
 			
 				sincronizado: false,
 				syncedAt: null,
-				chaveUnica: generateUniqueKey()
+				serverId: registroExistente?.serverId || null,
+				chaveUnica
 			};
 
 			try {
-				const db = await initDB();
-				
 				// Operação atômica de escrita
 				await db.put(STORE_NAME, registro);
+
+				// Mantém referência do registro atual para próximos saves
+				state.formularioEmEdicaoId = id;
 				
 				// Registra para sincronização em background
 				await registrarBackgroundSync();
@@ -1483,7 +1492,7 @@
 					setTimeout(() => attemptSync(), 1000);
 				}
 
-				showNotification('Formulário salvo localmente!', 'success');
+				showNotification(registroExistente ? 'Formulário atualizado com sucesso!' : 'Formulário salvo localmente!', 'success');
 				await renderFormulariosSalvos();	// Atualiza UI
 				
 			} catch (e) {
@@ -1635,6 +1644,9 @@
 					showNotification('Registro não encontrado', 'error');
 					return;
 				}
+
+				// Sinaliza modo de edição para evitar duplicação ao salvar
+				state.formularioEmEdicaoId = registro.id;
 
 				const f = registro;
 
@@ -1847,7 +1859,7 @@
 				// Fase 5: Service Worker registration (PWA capabilities)
 				if ('serviceWorker' in navigator) {
 					window.addEventListener('load', () => {
-						navigator.serviceWorker.register('./sw.js?v=0096')
+						navigator.serviceWorker.register('./sw.js?v=0097')
 							.then(reg => {
 								console.log('Service Worker registrado com sucesso. Scope:', reg.scope);
 							})
