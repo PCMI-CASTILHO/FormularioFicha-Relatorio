@@ -749,7 +749,7 @@
 		let syncState = {
 			pendingCount: 0,	// Contador de formulários pendentes de envio
 			isSyncing: false,	// Flag para evitar concorrência (mutex)
-			syncInterval: null	// Referência do intervalo de polling,
+			syncInterval: null,	// Referência do intervalo de polling
 			autoSyncBlocked: false // Bloqueia sincronização automática
 		};
 
@@ -1877,7 +1877,7 @@
 				// Fase 5: Service Worker registration (PWA capabilities)
 				if ('serviceWorker' in navigator) {
 					window.addEventListener('load', () => {
-						navigator.serviceWorker.register('./sw.js?v=0099')
+						navigator.serviceWorker.register('./sw.js?v=0100')
 							.then(reg => {
 								console.log('Service Worker registrado com sucesso. Scope:', reg.scope);
 							})
