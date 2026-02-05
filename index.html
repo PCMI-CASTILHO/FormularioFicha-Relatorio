@@ -198,8 +198,8 @@
 					<span id="status-text">Offline</span>
 				</div>
 				<!-- Botão para bloquear sincronização automática -->
-				<button id="toggle-auto-sync-btn" class="btn-secondary px-4 py-2 rounded-lg flex items-center" aria-pressed="false" title="Bloquear sincronização automática e manter apenas sincronização manual">
-					<i class="fas fa-user-lock mr-2"></i>
+				<button id="toggle-auto-sync-btn" class="btn-secondary px-4 py-2 rounded-lg flex items-center" aria-pressed="false" title="Alterna entre sincronização automática e manual">
+					<i class="fas fa-sync-alt mr-2"></i>
 					<span id="toggle-auto-sync-text">Auto Sync: Ativa</span>
 				</button>
 				<!-- Botão de sincronização de dados offline -->
@@ -1877,7 +1877,7 @@
 				// Fase 5: Service Worker registration (PWA capabilities)
 				if ('serviceWorker' in navigator) {
 					window.addEventListener('load', () => {
-						navigator.serviceWorker.register('./sw.js?v=0098')
+						navigator.serviceWorker.register('./sw.js?v=0099')
 							.then(reg => {
 								console.log('Service Worker registrado com sucesso. Scope:', reg.scope);
 							})
@@ -2510,12 +2510,20 @@
 		// ======== Inicialização do sistema de integração ========
 		// Bootstrap do módulo de sincronização offline/online
 		function initSync() {
+			console.log('🚀 Inicializando sistema de sincronização...');
+			
 			// Cache de referências a elementos DOM para performance
 			syncBtn = document.getElementById('sync-btn');
 			syncBadge = document.getElementById('sync-badge');
 			syncIcon = syncBtn.querySelector('i');
 			toggleAutoSyncBtn = document.getElementById('toggle-auto-sync-btn');
 			toggleAutoSyncText = document.getElementById('toggle-auto-sync-text');
+
+			if (!toggleAutoSyncBtn) {
+				console.error('❌ Botão toggle-auto-sync-btn não encontrado!');
+			} else {
+				console.log('✅ Botão de toggle encontrado');
+			}
 
 			loadAutoSyncPreference();
 			updateAutoSyncToggleUI();
@@ -2529,6 +2537,8 @@
 			// Binding de eventos de mudança de estado de rede
 			window.addEventListener('online', handleOnlineStatus);
 			window.addEventListener('offline', handleOfflineStatus);
+			
+			console.log('✅ Sistema de sincronização iniciado');
 		}
 
 		// ======== Gerenciamento do estado online/offline ========
@@ -2573,28 +2583,47 @@
 		}
 
 		function loadAutoSyncPreference() {
-			syncState.autoSyncBlocked = localStorage.getItem(AUTO_SYNC_STORAGE_KEY) === 'true';
+			// Carrega preferência do localStorage, padrão é FALSE (sincronização ATIVA)
+			const storedValue = localStorage.getItem(AUTO_SYNC_STORAGE_KEY);
+			
+			// Se nunca foi definido, define como false (ativo) e salva
+			if (storedValue === null) {
+				syncState.autoSyncBlocked = false;
+				localStorage.setItem(AUTO_SYNC_STORAGE_KEY, 'false');
+				console.log('✅ Sincronização automática ATIVA (primeira vez)');
+			} else {
+				syncState.autoSyncBlocked = storedValue === 'true';
+				console.log(`📋 Preferência carregada: Sync Auto ${syncState.autoSyncBlocked ? 'BLOQUEADA' : 'ATIVA'}`);
+			}
 		}
 
 		function updateAutoSyncToggleUI() {
-			if (!toggleAutoSyncBtn || !toggleAutoSyncText) return;
+			if (!toggleAutoSyncBtn || !toggleAutoSyncText) {
+				console.warn('⚠️ Elementos do botão de toggle não encontrados');
+				return;
+			}
 
 			if (syncState.autoSyncBlocked) {
 				toggleAutoSyncText.textContent = 'Auto Sync: Bloqueada';
 				toggleAutoSyncBtn.classList.remove('btn-secondary');
-				toggleAutoSyncBtn.classList.add('bg-amber-100', 'text-amber-800', 'border', 'border-amber-300');
+				toggleAutoSyncBtn.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-300');
 				toggleAutoSyncBtn.setAttribute('aria-pressed', 'true');
+				toggleAutoSyncBtn.title = 'Clique para ATIVAR a sincronização automática';
+				console.log('🔴 UI: Mostrando como BLOQUEADA');
 			} else {
 				toggleAutoSyncText.textContent = 'Auto Sync: Ativa';
 				toggleAutoSyncBtn.classList.add('btn-secondary');
-				toggleAutoSyncBtn.classList.remove('bg-amber-100', 'text-amber-800', 'border', 'border-amber-300');
+				toggleAutoSyncBtn.classList.remove('bg-red-100', 'text-red-800', 'border', 'border-red-300');
 				toggleAutoSyncBtn.setAttribute('aria-pressed', 'false');
+				toggleAutoSyncBtn.title = 'Clique para BLOQUEAR a sincronização automática';
+				console.log('🟢 UI: Mostrando como ATIVA');
 			}
 		}
 
 		function toggleAutoSyncMode() {
 			syncState.autoSyncBlocked = !syncState.autoSyncBlocked;
 			localStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(syncState.autoSyncBlocked));
+			console.log(`🔄 Toggle: Sync Auto agora está ${syncState.autoSyncBlocked ? 'BLOQUEADA' : 'ATIVA'}`);
 			updateAutoSyncToggleUI();
 
 			if (syncState.autoSyncBlocked) {
