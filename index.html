@@ -690,13 +690,14 @@
 
         // Estado global da aplicação
 		// Armazena dados temporários antes do envio
-        let state = {
-            fotos: [],			// Array de fotos capturadas
-            materiais: [],		// Array de materiais utilizados
-            assinaturas: {		// Objeto para armazenar assinaturas
-                cliente: null,	// Data URL da assinatura do cliente
-                tecnico: null	// Data URL da assinatura do técnico
-            }
+	    let state = {
+	    	fotos: [],			// Array de fotos capturadas
+	        materiais: [],		// Array de materiais utilizados
+			formularioEmEdicaoId: null,	// ID do formulário em edição
+	        assinaturas: {		// Objeto para armazenar assinaturas
+	            cliente: null,	// Data URL da assinatura do cliente
+	            tecnico: null	// Data URL da assinatura do técnico
+	        }
         };
 
 		// ======== Configuração de Sincronização ========
@@ -1846,7 +1847,7 @@
 				// Fase 5: Service Worker registration (PWA capabilities)
 				if ('serviceWorker' in navigator) {
 					window.addEventListener('load', () => {
-						navigator.serviceWorker.register('./sw.js?v=0095')
+						navigator.serviceWorker.register('./sw.js?v=0096')
 							.then(reg => {
 								console.log('Service Worker registrado com sucesso. Scope:', reg.scope);
 							})
