@@ -228,8 +228,8 @@ async function processarPDFsAutomatico(formData) {
 
         // 4. Enviar para WhatsApp
         console.log('📱 Enviando para WhatsApp...');
-        await enviarParaWhatsApp(urlMateriais, ´Ficha de Materiais ${serverId}`);
-        await enviarParaWhatsApp(urlRelatorio, ´Relatório de Serviço ${serverId}`);
+        await enviarParaWhatsApp(urlMateriais, 'Ficha de Materiais');
+        await enviarParaWhatsApp(urlRelatorio, 'Relatório de Serviço');
 
         console.log('✅ Enviado para WhatsApp com sucesso!');
 
