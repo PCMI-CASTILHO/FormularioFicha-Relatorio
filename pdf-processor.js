@@ -2,19 +2,7 @@
 // Solução robusta para processar PDFs mesmo após sincronização em background
 // Compatível com iOS e cenários offline → online
 
-// ======== CONFIGURAÇÕES SUPABASE ========
-const SUPABASE_CONFIG = {
-    url: 'https://sqiqmpgzjxjjztuzlewg.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxaXFtcGd6anhqanp0dXpsZXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2MDEzMzIsImV4cCI6MjA4NTE3NzMzMn0.o-IKqiSvBdUZoKiWHi2TzIBuXPG1jcL2JdUwedNM4y8',
-    bucket: 'pdfs-temporarios'
-};
-
-// ======== CONFIGURAÇÕES WHATSAPP ========
-const WHATSAPP_CONFIG = {
-    apiUrl: 'https://api.leadfinder.com.br/integracao/enviarMensagem/6B2991B488/ARQUIVO',
-    token: '58103127083906988C16EAD628F241E78C350689710608F82A91D2D3C4D36757',
-    groupId: '120363407457995562-group'
-};
+import { SUPABASE_CONFIG, WHATSAPP_CONFIG } from './config.js';
 
 // ======== VARIÁVEIS DE CONTROLE ========
 let monitorandoDB = false;
@@ -206,21 +194,21 @@ async function processarPDFsAutomatico(formData) {
         // 3. Upload para Supabase (apenas se não existir)
         if (materiaisExiste && relatorioExiste) {
             console.log('ℹ️ PDFs já existem no Supabase, usando URLs existentes');
-            urlMateriais = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${arquivoMateriais}`;
-            urlRelatorio = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${arquivoRelatorio}`;
+            urlMateriais = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${encodeURIComponent(arquivoMateriais)}`;
+            urlRelatorio = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${encodeURIComponent(arquivoRelatorio)}`;
         } else {
             console.log('☁️ Fazendo upload para Supabase...');
             
             if (!materiaisExiste) {
                 urlMateriais = await uploadParaSupabase(pdfFichaBlob, arquivoMateriais);
             } else {
-                urlMateriais = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${arquivoMateriais}`;
+                urlMateriais = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${encodeURIComponent(arquivoMateriais)}`;
             }
             
             if (!relatorioExiste) {
                 urlRelatorio = await uploadParaSupabase(pdfRelatorioBlob, arquivoRelatorio);
             } else {
-                urlRelatorio = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${arquivoRelatorio}`;
+                urlRelatorio = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${encodeURIComponent(arquivoRelatorio)}`;
             }
         }
 
@@ -228,8 +216,8 @@ async function processarPDFsAutomatico(formData) {
 
         // 4. Enviar para WhatsApp
         console.log('📱 Enviando para WhatsApp...');
-        await enviarParaWhatsApp(urlMateriais, 'Ficha de Materiais');
-        await enviarParaWhatsApp(urlRelatorio, 'Relatório de Serviço');
+        await enviarParaWhatsApp(urlMateriais, `Ficha de Materiais (Nº ${serverId})`);
+        await enviarParaWhatsApp(urlRelatorio, `Relatório de Serviço (Nº ${serverId})`);
 
         console.log('✅ Enviado para WhatsApp com sucesso!');
 
@@ -285,9 +273,15 @@ async function processarPDFsAutomatico(formData) {
 // ======== VERIFICAR SE ARQUIVO EXISTE NO SUPABASE ========
 async function verificarArquivoExiste(filename) {
     try {
+        const encodedFilename = encodeURIComponent(filename);
         const response = await fetch(
-            `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${filename}`,
-            { method: 'HEAD' }
+            `${SUPABASE_CONFIG.url}/storage/v1/object/${SUPABASE_CONFIG.bucket}/${encodedFilename}`,
+            {
+                method: 'HEAD',
+                headers: {
+                    'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+                }
+            }
         );
         return response.ok;
     } catch (err) {
@@ -301,8 +295,9 @@ async function uploadParaSupabase(blob, filename) {
         const formData = new FormData();
         formData.append('file', blob, filename);
 
+        const encodedFilename = encodeURIComponent(filename);
         const response = await fetch(
-            `${SUPABASE_CONFIG.url}/storage/v1/object/${SUPABASE_CONFIG.bucket}/${filename}`,
+            `${SUPABASE_CONFIG.url}/storage/v1/object/${SUPABASE_CONFIG.bucket}/${encodedFilename}`,
             {
                 method: 'POST',
                 headers: {
@@ -317,7 +312,7 @@ async function uploadParaSupabase(blob, filename) {
             throw new Error(`Upload falhou (${response.status}): ${error}`);
         }
 
-        const publicUrl = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${filename}`;
+        const publicUrl = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${encodedFilename}`;
         console.log(`✅ Arquivo ${filename} enviado para Supabase`);
         return publicUrl;
 
