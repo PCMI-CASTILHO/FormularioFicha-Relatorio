@@ -41,7 +41,7 @@
 	<script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
 	
 	<!-- Módulo de processamento de PDFs (compatível com iOS) -->
-	<script src="./pdf-processor.js"></script>
+	<script type="module" src="./pdf-processor.js"></script>
 
 	<!-- Registro do Service Worker para funcionalidades offline -->
 	<script>
@@ -207,10 +207,6 @@
 					<i class="fas fa-sync-alt mr-2"></i> Sincronizar
 					<!-- Badge para mostrar pendências -->
 					<span id="sync-badge" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center hidden">0</span>
-				</button>
-				<!-- Botão de exportação de dados -->
-				<button id="export-btn" class="btn-primary px-4 py-2 rounded-lg flex items-center">
-					<i class="fas fa-download mr-2"></i> Salvar
 				</button>
 			</div>
         </div>
@@ -452,6 +448,15 @@
             <div id="materiais-lista" class="space-y-2">
             </div>
         </section>
+
+		<div class="flex flex-col sm:flex-row sm:justify-end gap-4 mt-6">
+			<button id="export-btn" class="btn-primary px-6 py-3 rounded-lg flex items-center justify-center">
+				<i class="fas fa-download mr-2"></i> Salvar
+			</button>
+			<button id="clear-form-btn" class="btn-secondary px-6 py-3 rounded-lg flex items-center justify-center text-red-600 border-red-200 hover:text-red-700">
+				<i class="fas fa-eraser mr-2"></i> Limpar Formulário
+			</button>
+		</div>
     </main>
 	
 	<!-- Modal para visualização ampliada de imagens -->
@@ -714,6 +719,8 @@
 		};
 
 		const AUTO_SYNC_STORAGE_KEY = 'syncAutoBlocked';
+		const FORM_DRAFT_STORAGE_KEY = 'formularioDraft';
+		let draftSaveTimeout;
 		
 		// ======== Gerador de Chave Única ========
 		function generateUniqueKey() {
@@ -813,6 +820,7 @@
 			addFotosBtn.addEventListener('click', () => fotosInput.click());	// Trigger file input
 			fotosInput.addEventListener('change', handleFileSelect);			// Processar upload
 			addMaterialBtn.addEventListener('click', addMaterial);				// Adicionar material
+			document.getElementById('clear-form-btn').addEventListener('click', clearForm);
 			
 			// Atalho de teclado para adição de materiais
 			materialInput.addEventListener('keypress', (e) => {
@@ -848,6 +856,11 @@
 			if (document.getElementById('toggle-auto-sync-btn')) {
 				document.getElementById('toggle-auto-sync-btn').addEventListener('click', toggleAutoSyncMode);
 			}
+			
+			document.querySelectorAll('input, select, textarea').forEach(field => {
+				field.addEventListener('input', scheduleDraftSave);
+				field.addEventListener('change', scheduleDraftSave);
+			});
 		}
 		
 		// ======== Configuração Canvas ========
@@ -985,6 +998,7 @@
 		        ctxTecnico.clearRect(0, 0, canvasTecnico.width, canvasTecnico.height);
 		        state.assinaturas.tecnico = null;
 		    }
+			scheduleDraftSave();
 		    showNotification('Assinatura limpa', 'info');
 		}
 		
@@ -1068,6 +1082,7 @@
 							
 							state.fotos.push(fileData);				// Adiciona ao estado global
 							renderPhotoPreview(fileData);			// Atualiza UI
+							scheduleDraftSave();
 							showNotification('Foto adicionada e otimizada', 'success');
 						} catch (error) {
 							console.error('Erro ao processar imagem:', error);
@@ -1128,6 +1143,7 @@
         function deletePhoto(index) {
             state.fotos.splice(index, 1);	// Remove do array
             renderPhotos();					// Re-renderiza toda a galeria
+			scheduleDraftSave();
             showNotification('Arquivo removido', 'info');
         }
 		
@@ -1206,6 +1222,7 @@
             materialQtd.value = '';
 			
             renderMateriais();	// Atualiza UI
+			scheduleDraftSave();
             showNotification('Material adicionado', 'success');
         }
 		
@@ -1239,6 +1256,7 @@
                     const index = parseInt(this.getAttribute('data-index'));
                     state.materiais.splice(index, 1);	// Remove do estado
                     renderMateriais();					// Re-renderiza
+					scheduleDraftSave();
                     showNotification('Material removido', 'info');
                 });
             });
@@ -1266,6 +1284,98 @@
                 tecnicoNome: document.getElementById('tecnico-nome').value
             };
         }
+		
+		// ======== Rascunho do formulário (localStorage) ========
+		function scheduleDraftSave() {
+			clearTimeout(draftSaveTimeout);
+			draftSaveTimeout = setTimeout(saveDraftToStorage, 300);
+		}
+
+		function saveDraftToStorage() {
+			const draftData = {
+				formData: collectFormData(),
+				materiais: state.materiais,
+				fotos: state.fotos,
+				assinaturas: state.assinaturas
+			};
+
+			try {
+				localStorage.setItem(FORM_DRAFT_STORAGE_KEY, JSON.stringify(draftData));
+			} catch (error) {
+				console.warn('Não foi possível salvar o rascunho no armazenamento local:', error);
+				showNotification('Limite de armazenamento atingido. O rascunho não foi salvo.', 'error');
+			}
+		}
+
+		function loadDraftFromStorage() {
+			const rawDraft = localStorage.getItem(FORM_DRAFT_STORAGE_KEY);
+			if (!rawDraft) return;
+
+			try {
+				const draft = JSON.parse(rawDraft);
+				const formData = draft.formData || {};
+
+				for (const key in FIELD_ID_MAP) {
+					const elId = FIELD_ID_MAP[key];
+					const el = document.getElementById(elId);
+					if (!el) continue;
+
+					const value = formData[key] !== undefined ? formData[key] : '';
+					el.value = value;
+
+					if (elId === 'equipamento') {
+						equipamentoOutro.classList.toggle('hidden', el.value !== 'OUTRO');
+					}
+				}
+
+				state.materiais = Array.isArray(draft.materiais) ? draft.materiais : [];
+				state.fotos = Array.isArray(draft.fotos) ? draft.fotos : [];
+				state.assinaturas = draft.assinaturas || { cliente: null, tecnico: null };
+
+				renderMateriais();
+				renderPhotos();
+
+				if (state.assinaturas.cliente) {
+					drawDataUrlOnCanvas(state.assinaturas.cliente, canvasCliente, ctxCliente);
+				} else {
+					ctxCliente.clearRect(0, 0, canvasCliente.width, canvasCliente.height);
+				}
+
+				if (state.assinaturas.tecnico) {
+					drawDataUrlOnCanvas(state.assinaturas.tecnico, canvasTecnico, ctxTecnico);
+				} else {
+					ctxTecnico.clearRect(0, 0, canvasTecnico.width, canvasTecnico.height);
+				}
+			} catch (error) {
+				console.warn('Erro ao recuperar rascunho do formulário:', error);
+			}
+		}
+
+		function clearForm() {
+			for (const key in FIELD_ID_MAP) {
+				const elId = FIELD_ID_MAP[key];
+				const el = document.getElementById(elId);
+				if (!el) continue;
+				el.value = '';
+			}
+
+			equipamentoOutro.classList.add('hidden');
+			state.materiais = [];
+			state.fotos = [];
+			state.assinaturas = { cliente: null, tecnico: null };
+			state.formularioEmEdicaoId = null;
+
+			renderMateriais();
+			renderPhotos();
+			ctxCliente.clearRect(0, 0, canvasCliente.width, canvasCliente.height);
+			ctxTecnico.clearRect(0, 0, canvasTecnico.width, canvasTecnico.height);
+			fotosInput.value = '';
+			document.getElementById('lock-cliente').checked = false;
+			document.getElementById('lock-tecnico').checked = false;
+
+			localStorage.removeItem(FORM_DRAFT_STORAGE_KEY);
+			showNotification('Formulário limpo.', 'info');
+		}
 		
 		// Validação do formulário
         function validateForm() {
@@ -1716,6 +1826,7 @@
 				}
 
 				showNotification('Formulário carregado para edição.', 'info');
+				saveDraftToStorage();
 				
 				// Scroll para topo com animação
 				window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1873,11 +1984,12 @@
 				setupSignatureCanvas(canvasCliente, ctxCliente, 'cliente');	// Signature pad initialization
 				setupSignatureCanvas(canvasTecnico, ctxTecnico, 'tecnico');
 				populateMaterialsDatalist();								// Autocomplete data population
+				loadDraftFromStorage();										// Restaura rascunho local
 
 				// Fase 5: Service Worker registration (PWA capabilities)
 				if ('serviceWorker' in navigator) {
 					window.addEventListener('load', () => {
-						navigator.serviceWorker.register('./sw.js?v=0100')
+						navigator.serviceWorker.register('./sw.js?v=0106')
 							.then(reg => {
 								console.log('Service Worker registrado com sucesso. Scope:', reg.scope);
 							})
