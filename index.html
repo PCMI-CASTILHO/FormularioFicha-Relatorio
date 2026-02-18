@@ -46,7 +46,7 @@
 	<!-- Registro do Service Worker para funcionalidades offline -->
 	<script>
 	if ("serviceWorker" in navigator) {
-		navigator.serviceWorker.register("./.js");
+		navigator.serviceWorker.register("./sw.js");
 	}
 	</script>
 
@@ -1993,7 +1993,7 @@
 				// Fase 5: Service Worker registration (PWA capabilities)
 				if ('serviceWorker' in navigator) {
 					window.addEventListener('load', () => {
-						navigator.serviceWorker.register('./sw.js?v=0109')
+						navigator.serviceWorker.register('./sw.js?v=0113')
 							.then(reg => {
 								console.log('Service Worker registrado com sucesso. Scope:', reg.scope);
 							})
