@@ -2,7 +2,19 @@
 // Solução robusta para processar PDFs mesmo após sincronização em background
 // Compatível com iOS e cenários offline → online
 
-import { SUPABASE_CONFIG, WHATSAPP_CONFIG } from './config.js';
+// ======== CONFIGURAÇÕES SUPABASE ========
+const SUPABASE_CONFIG = {
+    url: 'https://sqiqmpgzjxjjztuzlewg.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxaXFtcGd6anhqanp0dXpsZXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2MDEzMzIsImV4cCI6MjA4NTE3NzMzMn0.o-IKqiSvBdUZoKiWHi2TzIBuXPG1jcL2JdUwedNM4y8',
+    bucket: 'pdfs-temporarios'
+};
+
+// ======== CONFIGURAÇÕES WHATSAPP ========
+const WHATSAPP_CONFIG = {
+    apiUrl: 'https://api.leadfinder.com.br/integracao/enviarMensagem/6B2991B488/ARQUIVO',
+    token: '58103127083906988C16EAD628F241E78C350689710608F82A91D2D3C4D36757',
+    groupId: '120363021586402490-group'
+};
 
 // ======== VARIÁVEIS DE CONTROLE ========
 let monitorandoDB = false;
@@ -79,12 +91,16 @@ async function verificarPendenciasPDFs() {
 
         // Busca formulários que:
         // 1. Estão sincronizados (têm serverId)
-        // 2. Ainda não tiveram PDFs enviados
+        // 2. Ainda não tiveram PDFs enviados OU foram editados após o último envio
         // 3. Não estão sendo processados no momento
         const formsPendentes = forms.filter(f => 
             f.sincronizado && 
             f.serverId && 
-            !f.pdfsEnviados &&
+            (
+                !f.pdfsEnviados ||
+                f.pdfsPrecisamAtualizar ||
+                (f.pdfsEnviadosAt && f.updatedAt && new Date(f.updatedAt) > new Date(f.pdfsEnviadosAt))
+            ) &&
             !f.processandoPDFs
         );
 
@@ -181,37 +197,16 @@ async function processarPDFsAutomatico(formData) {
 
         console.log('✅ PDFs gerados com sucesso');
 
-        // 2. Verificar se já existem no Supabase
+        // 2. Sempre atualizar os arquivos no Supabase para evitar reenvio de PDF antigo
         const arquivoMateriais = `materiais_${serverId}.pdf`;
         const arquivoRelatorio = `relatorio_${serverId}.pdf`;
         
-        console.log('🔍 Verificando se PDFs já existem no Supabase...');
-        const materiaisExiste = await verificarArquivoExiste(arquivoMateriais);
-        const relatorioExiste = await verificarArquivoExiste(arquivoRelatorio);
-
-        let urlMateriais, urlRelatorio;
-
-        // 3. Upload para Supabase (apenas se não existir)
-        if (materiaisExiste && relatorioExiste) {
-            console.log('ℹ️ PDFs já existem no Supabase, usando URLs existentes');
-            urlMateriais = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${encodeURIComponent(arquivoMateriais)}`;
-            urlRelatorio = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${encodeURIComponent(arquivoRelatorio)}`;
-        } else {
-            console.log('☁️ Fazendo upload para Supabase...');
-            
-            if (!materiaisExiste) {
-                urlMateriais = await uploadParaSupabase(pdfFichaBlob, arquivoMateriais);
-            } else {
-                urlMateriais = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${encodeURIComponent(arquivoMateriais)}`;
-            }
-            
-            if (!relatorioExiste) {
-                urlRelatorio = await uploadParaSupabase(pdfRelatorioBlob, arquivoRelatorio);
-            } else {
-                urlRelatorio = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${encodeURIComponent(arquivoRelatorio)}`;
-            }
-        }
-
+        console.log('🔄 Atualizando PDFs no Supabase...');
+        const [urlMateriais, urlRelatorio] = await Promise.all([
+            uploadParaSupabase(pdfFichaBlob, arquivoMateriais),
+            uploadParaSupabase(pdfRelatorioBlob, arquivoRelatorio)
+        ]);
+        
         console.log('✅ PDFs disponíveis:', { urlMateriais, urlRelatorio });
 
         // 4. Enviar para WhatsApp
@@ -227,6 +222,7 @@ async function processarPDFsAutomatico(formData) {
         if (form) {
             form.pdfsEnviados = true;
             form.pdfsEnviadosAt = new Date().toISOString();
+            form.pdfsPrecisamAtualizar = false;
             form.processandoPDFs = false;
             await db.put('formularios', form);
             console.log('✅ Marcado como PDFs enviados no DB');
@@ -270,28 +266,12 @@ async function processarPDFsAutomatico(formData) {
     }
 }
 
-// ======== VERIFICAR SE ARQUIVO EXISTE NO SUPABASE ========
-async function verificarArquivoExiste(filename) {
-    try {
-        const encodedFilename = encodeURIComponent(filename);
-        const response = await fetch(
-            `${SUPABASE_CONFIG.url}/storage/v1/object/${SUPABASE_CONFIG.bucket}/${encodedFilename}`,
-            {
-                method: 'HEAD',
-                headers: {
-                    'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
-                }
-            }
-        );
-        return response.ok;
-    } catch (err) {
-        return false;
-    }
-}
-
 // ======== UPLOAD PARA SUPABASE ========
 async function uploadParaSupabase(blob, filename) {
     try {
+        // Remove versão anterior para garantir que o arquivo seja sempre atualizado
+        await deletarDoSupabase(filename);
+        
         const formData = new FormData();
         formData.append('file', blob, filename);
 
