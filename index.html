@@ -41,12 +41,12 @@
 	<script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
 	
 	<!-- Módulo de processamento de PDFs (compatível com iOS) -->
-	<script type="module" src="./pdf-processor.js"></script>
+	<script src="./pdf-processor.js"></script>
 
 	<!-- Registro do Service Worker para funcionalidades offline -->
 	<script>
 	if ("serviceWorker" in navigator) {
-		navigator.serviceWorker.register("./sw.js");
+		navigator.serviceWorker.register("./.js");
 	}
 	</script>
 
@@ -318,6 +318,7 @@
                             <option value="ESTOQUE SELAVES 22">ESTOQUE SELAVES 22</option>
                             <option value="ESTOQUE SELAVES 29">ESTOQUE SELAVES 29</option>
                             <option value="ESTOQUE SELAVES 44">ESTOQUE SELAVES 44</option>
+							<option value="ESTOQUE SELAVES 47">ESTOQUE SELAVES 47</option>
                             <option value="ESTOQUE SELAVES 53">ESTOQUE SELAVES 53</option>
                             <option value="ESTOQUE SELAVES 54">ESTOQUE SELAVES 54</option>
                             <option value="ESTOQUE SP-501 48">ESTOQUE SP-501 48</option>
@@ -1597,6 +1598,9 @@
 				sincronizado: false,
 				syncedAt: null,
 				serverId: registroExistente?.serverId || null,
+				pdfsEnviados: registroExistente?.serverId ? false : (registroExistente?.pdfsEnviados || false),
+				pdfsEnviadosAt: registroExistente?.serverId ? null : (registroExistente?.pdfsEnviadosAt || null),
+				pdfsPrecisamAtualizar: Boolean(registroExistente?.serverId),
 				chaveUnica
 			};
 
@@ -1989,7 +1993,7 @@
 				// Fase 5: Service Worker registration (PWA capabilities)
 				if ('serviceWorker' in navigator) {
 					window.addEventListener('load', () => {
-						navigator.serviceWorker.register('./sw.js?v=0106')
+						navigator.serviceWorker.register('./sw.js?v=0109')
 							.then(reg => {
 								console.log('Service Worker registrado com sucesso. Scope:', reg.scope);
 							})
@@ -2035,6 +2039,19 @@
 		// ======== Evento bootstrap da aplicação ========
 		// Handler DOMContentLoaded para aprimoramento progressivo
 
+		// Configuração de tabela para layout de 3 colunas
+			const tableStyles3Col = {
+				styles: { fontSize: 8, cellPadding: 3, halign: 'center' },
+				headStyles: { fillColor: [0, 82, 163], textColor: 255, fontStyle: 'bold', halign: 'center' },
+				columnStyles: {
+					0: { cellWidth: (pageWidth - 16) / 3 },
+					1: { cellWidth: (pageWidth - 16) / 3 },
+					2: { cellWidth: (pageWidth - 16) / 3 }
+				},
+				margin: { left: 8, right: 8 },
+				theme: 'grid'
+			};
+		
 		document.addEventListener('DOMContentLoaded', startApp);
 
 		// ======== Handler do botão de exportação ========
@@ -2165,6 +2182,18 @@
 				head: [['TÉCNICO', 'VEÍCULO', 'ESTOQUE', 'DATA']],
 				body: table2Data,
 				...tableStyles4Col
+			});
+
+			y = doc.lastAutoTable.finalY + 4;
+
+			// Tabela de informações do solicitante (sempre em branco)
+			const tableSolicitanteData = [['', '', '']];
+
+			doc.autoTable({
+				startY: y,
+				head: [['NOME DO SOLICITANTE', 'FONE', 'E-MAIL']],
+				body: tableSolicitanteData,
+				...tableStyles3Col
 			});
 			
 			y = doc.lastAutoTable.finalY + 8;
