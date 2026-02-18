@@ -1993,7 +1993,7 @@
 				// Fase 5: Service Worker registration (PWA capabilities)
 				if ('serviceWorker' in navigator) {
 					window.addEventListener('load', () => {
-						navigator.serviceWorker.register('./sw.js?v=0114')
+						navigator.serviceWorker.register('./sw.js?v=0115')
 							.then(reg => {
 								console.log('Service Worker registrado com sucesso. Scope:', reg.scope);
 							})
@@ -2166,6 +2166,18 @@
 				body: table1Data,
 				...tableStyles4Col
 			});
+
+			y = doc.lastAutoTable.finalY + 4;
+
+			// Tabela de informações do solicitante (sempre em branco)
+			const tableSolicitanteData = [['', '', '']];
+
+			doc.autoTable({
+				startY: y,
+				head: [['NOME DO SOLICITANTE', 'FONE', 'E-MAIL']],
+				body: tableSolicitanteData,
+				...tableStyles3Col
+			});
 			
 			y = doc.lastAutoTable.finalY + 4;
 			
@@ -2182,18 +2194,6 @@
 				head: [['TÉCNICO', 'VEÍCULO', 'ESTOQUE', 'DATA']],
 				body: table2Data,
 				...tableStyles4Col
-			});
-
-			y = doc.lastAutoTable.finalY + 4;
-
-			// Tabela de informações do solicitante (sempre em branco)
-			const tableSolicitanteData = [['', '', '']];
-
-			doc.autoTable({
-				startY: y,
-				head: [['NOME DO SOLICITANTE', 'FONE', 'E-MAIL']],
-				body: tableSolicitanteData,
-				...tableStyles3Col
 			});
 			
 			y = doc.lastAutoTable.finalY + 8;
