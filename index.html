@@ -1993,7 +1993,7 @@
 				// Fase 5: Service Worker registration (PWA capabilities)
 				if ('serviceWorker' in navigator) {
 					window.addEventListener('load', () => {
-						navigator.serviceWorker.register('./sw.js?v=0113')
+						navigator.serviceWorker.register('./sw.js?v=0114')
 							.then(reg => {
 								console.log('Service Worker registrado com sucesso. Scope:', reg.scope);
 							})
@@ -2039,19 +2039,6 @@
 		// ======== Evento bootstrap da aplicação ========
 		// Handler DOMContentLoaded para aprimoramento progressivo
 
-		// Configuração de tabela para layout de 3 colunas
-			const tableStyles3Col = {
-				styles: { fontSize: 8, cellPadding: 3, halign: 'center' },
-				headStyles: { fillColor: [0, 82, 163], textColor: 255, fontStyle: 'bold', halign: 'center' },
-				columnStyles: {
-					0: { cellWidth: (pageWidth - 16) / 3 },
-					1: { cellWidth: (pageWidth - 16) / 3 },
-					2: { cellWidth: (pageWidth - 16) / 3 }
-				},
-				margin: { left: 8, right: 8 },
-				theme: 'grid'
-			};
-		
 		document.addEventListener('DOMContentLoaded', startApp);
 
 		// ======== Handler do botão de exportação ========
@@ -2115,6 +2102,19 @@
 			// Calcula dimensões da página para layout responsivo
 			const pageWidth = doc.internal.pageSize.getWidth();
 			const pageHeight = doc.internal.pageSize.getHeight();
+
+			// Configuração de tabela para layout de 3 colunas
+			const tableStyles3Col = {
+				styles: { fontSize: 8, cellPadding: 3, halign: 'center' },
+				headStyles: { fillColor: [0, 82, 163], textColor: 255, fontStyle: 'bold', halign: 'center' },
+				columnStyles: {
+					0: { cellWidth: (pageWidth - 16) / 3 },
+					1: { cellWidth: (pageWidth - 16) / 3 },
+					2: { cellWidth: (pageWidth - 16) / 3 }
+				},
+				margin: { left: 8, right: 8 },
+				theme: 'grid'
+			};
 
 			const logo = await carregarImagem("Logo.png");
 			let y = 20;	// Posição vertical do cursor
